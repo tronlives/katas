@@ -1,6 +1,9 @@
 package com.company;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -15,110 +18,118 @@ public class CSVProcessor {
 
     static int defaultStartPage = 0;
     static int defaultEndPage = 5;
+    static int page = 5;
     static StringBuilder tableLine = new StringBuilder();
 
+    static String lastLine = "N(ext page), P(revious page), F(irst page), L(ast page), eX(it)";
 
     public static void main(String[] args) throws IOException, InterruptedException {
 
-        int page = 5;
 
-        int beginPage = 0;
-        int stopPage = 5;
+        List<String> csvFileContent = null;
 
-        File[] files = new File(".").listFiles();
+        csvFileContent = retrieveCSVFile();
 
-        File inputFile = null;
-        List<CSVItem> csvItems = null;
-        for (File file : files) {
-            if (file.isFile() && file.getName().contains("CSVTestFile")) {
-                inputFile = file;
-            }
+        final List<List<String>> csvData = processCSVLines(csvFileContent);
+
+        List<String> outputArray = prepareOutput(csvData);
+
+        String tableLine = renderTableLine(outputArray);
+
+        String header = determineHeader(outputArray);
+
+        System.out.println(header);
+        System.out.println(tableLine.toString());
+        System.out.println(lastLine);
+        outputArray.remove(0);
+        processUserInteraction(outputArray, header);
+
+    }
+
+    public static String determineHeader(List<String> outputArray) {
+        String arrayHeader = outputArray.subList(0, 1).toString();
+        return arrayHeader.substring(1, arrayHeader.length() - 1);
+    }
+
+    public static String renderTableLine(List<String> outputArray) {
+        String outputLine = outputArray.get(0);
+
+        for (int i = 0; i < outputLine.length(); i++) {
+
+            tableLine.append("-");
         }
+        return tableLine.toString();
+    }
 
-        if (inputFile == null) {
+    public static List<String> retrieveCSVFile() throws IOException {
+        Path path = Paths.get(".", "CSVTestFile.txt");
+
+
+        if (path == null) {
             System.out.println("no inputFile with name CSVTestFile was found.");
+            System.exit(1);
+
         } else {
-            csvItems = new CSVProcessor().processInputFile(inputFile.getName());
+            return Files.readAllLines(path);
+
         }
+        return null;
+    }
+
+    public static List<String> prepareOutput(List<List<String>> csvData) throws IOException {
+
+        ArrayList<Integer> maxLengthArray = new ArrayList<Integer>();
+
         int maxLengthEntry = 0;
-        ArrayList<Integer> maxLengthNameArray = new ArrayList<Integer>();
-        ArrayList<Integer> maxLengthAgeArray = new ArrayList<Integer>();
-        ArrayList<Integer> maxLengthCityArray = new ArrayList<Integer>();
+
+        String outputLine = "";
 
         ArrayList<String> outputArray = new ArrayList<String>();
 
-        prepareViewer(page, defaultStartPage, defaultEndPage, csvItems, maxLengthNameArray, maxLengthAgeArray, maxLengthCityArray, outputArray);
+        for (List<String> line : csvData) {
 
-    }
+            for (String entry : line) {
 
-    private static void prepareViewer(int page, int startPage, int endPage, List<CSVItem> csvItems, ArrayList<Integer> maxLengthNameArray, ArrayList<Integer> maxLengthAgeArray, ArrayList<Integer> maxLengthCityArray, ArrayList<String> outputArray) throws IOException {
-        for (CSVItem item : csvItems) {
-
-            maxLengthNameArray.add(item.getName().length());
-            maxLengthAgeArray.add(item.getAge().length());
-            maxLengthCityArray.add(item.getCity().length());
+                maxLengthArray.add(entry.length());
+            }
         }
-        Collections.sort(maxLengthNameArray);
-        Collections.sort(maxLengthAgeArray);
-        Collections.sort(maxLengthCityArray);
+        Collections.sort(maxLengthArray);
 
+        int maxLength = maxLengthArray.get(maxLengthArray.size() - 1);
 
-        int maxNameLength = maxLengthNameArray.get(maxLengthNameArray.size() - 1);
-        int maxAgeLength = 3;
-        int maxCityLength = maxLengthCityArray.get(maxLengthCityArray.size() - 1);
+        for (List<String> line : csvData) {
+            if (line.isEmpty() || line.get(0) == null) {
+                System.out.println("CSV file includes empty lines or entries");
+                System.exit(1);
+            }
 
+            outputLine = "";
 
-        for (CSVItem item : csvItems) {
+            for (String entry : line) {
 
-            int entryNameLength = item.getName().length();
-            int paddingNameLength = maxNameLength - entryNameLength;
-            int entryCityLength = item.getCity().length();
-            int paddingCityLength = maxCityLength - entryCityLength;
-            int entryAgeLength = item.getAge().length();
-            int paddingAgeLength = maxAgeLength - entryAgeLength;
+                int entryLength = entry.length();
+                int paddingLength = maxLength - entryLength;
+                String entryName = padding(entry, paddingLength, " ");
 
-            String entryName = rightPadding(item.getName(), paddingNameLength, " ");
-            String entryAge = rightPadding(item.getAge(), paddingAgeLength, " ");
-            String entryCity = rightPadding(item.getCity(), paddingCityLength, " ");
+                outputLine = outputLine + entryName + "|";
 
-            String outputLine = entryName + "|" + entryAge + "|" + entryCity + "|";
+            }
 
             outputArray.add(outputLine);
-            System.out.println(outputLine);
 
-
-            if (item.getName().equalsIgnoreCase("Name")) {
-
-                int maxLineLength = entryName.length() + entryAge.length() + entryCity.length() + 3;
-
-                for (int x = 0; x < maxLineLength; x++) {
-
-                    tableLine.append("-");
-
-                }
-            }
-            System.out.print("\n");
         }
 
-        String lastLine = "N(ext page), P(revious page), F(irst page), L(ast page), eX(it)";
-
-        System.out.println(lastLine);
-
-        List<String> pageArray = outputArray.subList(startPage + 1, endPage + 1);
-
-        pageOutput(page, startPage, endPage, outputArray);
+        return outputArray;
     }
 
-    private static void pageOutput(int page, int startPage, int endPage, ArrayList<String> outputArray) throws IOException {
+    public static void processUserInteraction(List<String> outputArray, String header) throws IOException {
         int beginPage;
         int stopPage;
         List<String> pageArray = null;
-        beginPage = startPage;
-        stopPage = endPage;
+        beginPage = defaultStartPage;
+        stopPage = defaultEndPage;
 
-        Scanner inputReader = new Scanner(System.in);
-
-        String line = inputReader.nextLine();
+        String line = getUserInput();
 
         switch (line) {
             case "N":
@@ -158,16 +169,25 @@ public class CSVProcessor {
                 System.out.println("Goodbye!");
                 System.exit(1);
             default:
-                pageOutput(page, beginPage, stopPage, outputArray);
+                processUserInteraction(outputArray, header);
         }
 
-        outputContent(outputArray.subList(0,1));
+        displayConsole(outputArray, header, pageArray);
+    }
+
+    public static void displayConsole(List<String> outputArray, String header, List<String> pageArray) throws IOException {
+        System.out.println(header);
         System.out.println(tableLine.toString());
         outputContent(pageArray);
-        String lastLine = "N(ext page), P(revious page), F(irst page), L(ast page), eX(it)";
         System.out.println(lastLine);
 
-        pageOutput(page, beginPage, stopPage, outputArray);
+        processUserInteraction(outputArray, header);
+    }
+
+    public static String getUserInput() {
+        Scanner inputReader = new Scanner(System.in);
+
+        return inputReader.nextLine();
     }
 
 
@@ -178,63 +198,57 @@ public class CSVProcessor {
 
     }
 
-    public static String rightPadding(String str, int size, String padSymbol) {
+    public static String padding(String str, int size, String padSymbol) {
 
         StringBuilder sb = new StringBuilder();
-        sb.append(str);
+
         if (str == null) {
             return null;
         }
 
         if (size <= 0) {
             return str; // returns original String when possible
+        } else if (!(str.length() < 3)) {
+
+            sb.append(str);
+            fillpads(size, sb);
         } else {
-            for (int x = 0; x < size; x++) {
-                sb.append(" ");
-            }
+            fillpads(size, sb);
+            sb.append(str);
         }
+        return sb.toString();
+    }
+
+    private static String fillpads(int size, StringBuilder sb) {
+        for (int x = 0; x < size; x++) {
+            sb.append(" ");
+        }
+
 
         return sb.toString();
     }
 
 
-    private List<CSVItem> processInputFile(String inputFilePath) throws IOException {
+    public static List<List<String>> processCSVLines(List<String> csvLines) throws IOException {
 
-        File inputF = new File(inputFilePath);
-        InputStream inputFS = new FileInputStream(inputF);
+        List<List<String>> csvDatas = csvLines.stream().map(mapToItem).collect(Collectors.toList());
 
-        List<CSVItem> inputList = null;
-        try {
-            BufferedReader br = new BufferedReader(new InputStreamReader(inputFS));
-            {
-
-                inputList = br.lines().map(mapToItem).collect(Collectors.toList());
-                br.close();
-            }
-        } catch (IOException ioe) {
-
-        }
-        return inputList;
+        return csvDatas;
     }
 
 
-    private Function<String, CSVItem> mapToItem = (line) -> {
+    private static Function<String, ArrayList<String>> mapToItem = (line) -> {
         String[] p = line.split(SEPERATOR);// a CSV has comma separated lines
-        CSVItem item = new CSVItem();
 
-        if (p[0] != null && p[0].trim().length() > 0) {
-            item.setName(p[0]);
+        ArrayList<String> csvListItem = new ArrayList<>();
+
+        for(String token:p) {
+
+            if (token != null && token.trim().length() > 0) {
+                csvListItem.add(token);
+            }
         }
 
-        if (p[1] != null && p[1].trim().length() > 0) {
-            item.setAge(p[1]);
-        }
-        if (p[2] != null && p[2].trim().length() > 0) {
-            item.setCity(p[2]);
-        }
-
-
-        //more initialization goes here
-        return item;
+         return csvListItem;
     };
 }
